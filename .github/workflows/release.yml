@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: master
+          ref: dev
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: master
+          ref: dev
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
