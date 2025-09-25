@@ -3,6 +3,7 @@
   "type": "module",
   "version": "8.1.4",
   "private": true,
+  "packageManager": "pnpm@10.17.1+sha512.17c560fca4867ae9473a3899ad84a88334914f379be46d455cbf92e5cf4b39d34985d452d2583baf19967fa76cb5c17bc9e245529d0b98745721aa7200ecaf7a",
   "engines": {
     "node": "22",
     "pnpm": "10"
@@ -36,6 +37,7 @@
     "croner": "^9.1.0",
     "execa": "^9.6.0",
     "h3": "^1.15.4",
+    "hot-shots": "^11.2.0",
     "kysely": "^0.28.5",
     "mysql2": "^3.14.4",
     "nitropack": "^2.12.5",
@@ -76,7 +78,12 @@
       "better-sqlite3",
       "cpu-features",
       "esbuild",
-      "ssh2"
+      "protobufjs",
+      "ssh2",
+      "unrs-resolver"
+    ],
+    "ignoredBuiltDependencies": [
+      "unix-dgram"
     ]
   }
 }

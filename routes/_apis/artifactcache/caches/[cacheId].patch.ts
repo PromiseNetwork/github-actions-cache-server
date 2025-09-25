@@ -1,8 +1,10 @@
 import type { Buffer } from 'node:buffer'
 
+import type { CacheMetricsTags } from '~/lib/metrics'
 import { z } from 'zod'
+import { ENV } from '~/lib/env'
 import { logger } from '~/lib/logger'
-
+import { getMetrics, METRICS } from '~/lib/metrics'
 import { useStorageAdapter } from '~/lib/storage'
 
 const pathParamsSchema = z.object({
@@ -49,6 +51,22 @@ export default defineEventHandler(async (event) => {
     chunkStart: start,
     chunkIndex,
   })
+
+  // Record chunk upload metrics and cache size
+  if (ENV.METRICS_ENABLED) {
+    try {
+      const metrics = getMetrics()
+      const chunkSize = end - start + 1
+      const tags: CacheMetricsTags = {
+        operation: 'upload',
+        storage_driver: ENV.STORAGE_DRIVER,
+      }
+      metrics.increment(METRICS.CACHE.UPLOAD_CHUNKS, 1, tags)
+      metrics.histogram(METRICS.CACHE.SIZE_BYTES, chunkSize, tags)
+    } catch (err) {
+      console.warn('Failed to record upload metrics:', err)
+    }
+  }
 })
 
 function parseContentRangeHeader(contentRange: string) {
