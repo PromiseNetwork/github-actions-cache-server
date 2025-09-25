@@ -85,6 +85,6 @@ jobs:
         run: |
           shopt -s nullglob
           for pkg in ${{ env.CHART_DIR }}/packaged/*.tgz; do
-            echo "Pushing $pkg to ghcr.io/${{ github.repository_owner }}/charts/github-actions-cache-server"
-            helm push "$pkg" "oci://ghcr.io/${{ github.repository_owner }}/charts/github-actions-cache-server"
+            echo "Pushing $pkg to ghcr.io/promisenetwork/charts"
+            helm push "$pkg" "oci://ghcr.io/promisenetwork/charts"
           done
