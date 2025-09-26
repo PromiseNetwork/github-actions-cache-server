@@ -14,6 +14,10 @@ const envSchema = z.object({
   DEBUG: z.stringbool().default(false),
   NITRO_PORT: portSchema.default(3000),
   TEMP_DIR: z.string().default(tmpdir()),
+  METRICS_ENABLED: z.stringbool().default(false),
+  METRICS_HOST: z.string().default('localhost'),
+  METRICS_PORT: portSchema.default(8125),
+  METRICS_PREFIX: z.string().default('cache_server.'),
 })
 
 const parsedEnv = envSchema.safeParse(process.env)

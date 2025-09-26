@@ -1,10 +1,21 @@
-import cluster from 'node:cluster'
+import type { HttpMetricsTags } from '~/lib/metrics'
 
+import cluster from 'node:cluster'
 import { H3Error } from 'h3'
 import { useDB } from '~/lib/db'
 import { ENV } from '~/lib/env'
 import { logger } from '~/lib/logger'
+import { getMetrics, initializeMetrics, METRICS } from '~/lib/metrics'
 import { useStorageAdapter } from '~/lib/storage'
+
+function getEndpointName(path: string): string {
+  // Normalize dynamic routes for better metric grouping
+  return path
+    .replaceAll(/\/\d+/g, '/:id') // Replace numeric IDs
+    .replaceAll(/\/[a-f0-9-]{36}/g, '/:uuid') // Replace UUIDs
+    .replaceAll(/\/[a-f0-9]{8,}/g, '/:hash') // Replace long hashes
+    .replace(/\/_apis\/artifactcache/, '/api/cache') // Simplify API paths
+}
 
 export default defineNitroPlugin(async (nitro) => {
   const version = useRuntimeConfig().version
@@ -13,16 +24,79 @@ export default defineNitroPlugin(async (nitro) => {
   await useDB()
   await useStorageAdapter()
 
+  // Initialize metrics
+  initializeMetrics({
+    enabled: ENV.METRICS_ENABLED,
+    host: ENV.METRICS_HOST,
+    port: ENV.METRICS_PORT,
+    prefix: ENV.METRICS_PREFIX,
+    globalTags: {
+      service: 'github-actions-cache-server',
+      version: version || 'unknown',
+      storage_driver: ENV.STORAGE_DRIVER,
+      db_driver: ENV.DB_DRIVER,
+    },
+  })
+
+  // Track HTTP request metrics
+  nitro.hooks.hook('request', (event) => {
+    if (ENV.METRICS_ENABLED) {
+      event.context._startTime = Date.now()
+    }
+  })
+
+  // eslint-disable-next-line @shopify/prefer-early-return
+  nitro.hooks.hook('afterResponse', (event) => {
+    if (ENV.METRICS_ENABLED && event.context._startTime) {
+      const duration = Date.now() - event.context._startTime
+      const statusCode = getResponseStatus(event).toString()
+      const endpoint = getEndpointName(event.path)
+
+      const tags: HttpMetricsTags = {
+        method: event.method || 'UNKNOWN',
+        endpoint,
+        status_code: statusCode,
+      }
+
+      try {
+        const metrics = getMetrics()
+        metrics.increment(METRICS.HTTP.REQUESTS_TOTAL, 1, tags)
+        metrics.timing(METRICS.HTTP.RESPONSE_TIME, duration, tags)
+      } catch (err) {
+        logger.warn('Failed to record HTTP metrics:', err)
+      }
+    }
+  })
+
   nitro.hooks.hook('error', (error, { event }) => {
     if (!event) {
       logger.error(error)
       return
     }
 
-    logger.error(
-      `Response: ${event.method} ${event.path} > ${error instanceof H3Error ? error.statusCode : '[no status code]'}\n`,
-      error,
-    )
+    const statusCode = error instanceof H3Error ? error.statusCode : 500
+
+    // Record error metrics
+    if (ENV.METRICS_ENABLED && event.context._startTime) {
+      const duration = Date.now() - event.context._startTime
+      const endpoint = getEndpointName(event.path)
+
+      const tags: HttpMetricsTags = {
+        method: event.method || 'UNKNOWN',
+        endpoint,
+        status_code: statusCode.toString(),
+      }
+
+      try {
+        const metrics = getMetrics()
+        metrics.increment(METRICS.HTTP.REQUESTS_TOTAL, 1, tags)
+        metrics.timing(METRICS.HTTP.RESPONSE_TIME, duration, tags)
+      } catch (err) {
+        logger.warn('Failed to record error metrics:', err)
+      }
+    }
+
+    logger.error(`Response: ${event.method} ${event.path} > ${statusCode}\n`, error)
   })
 
   if (ENV.DEBUG) {

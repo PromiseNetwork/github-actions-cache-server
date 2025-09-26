@@ -44,6 +44,9 @@ importers:
       h3:
         specifier: ^1.15.4
         version: 1.15.4
+      hot-shots:
+        specifier: ^11.2.0
+        version: 11.2.0
       kysely:
         specifier: ^0.28.5
         version: 0.28.5
@@ -3822,6 +3825,10 @@ packages:
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
 
+  hot-shots@11.2.0:
+    resolution: {integrity: sha512-cGiFSgTZtVODx0yMW67gPICgref3XuxkTMrXP0h5cSd1HHG3OG7L2C6+aW70MAtlUNl+9+DOq/xXyJUVKDyeUg==}
+    engines: {node: '>=16.0.0'}
+
   html-entities@2.6.0:
     resolution: {integrity: sha512-kig+rMn/QOVRvr7c86gQ8lWXq+Hkv6CbAH1hLu+RG338StTpE8Z0b44SDVaqVu7HGKf27frdmUYEs9hTUX/cLQ==}
 
@@ -5877,6 +5884,10 @@ packages:
 
   unist-util-visit@5.0.0:
     resolution: {integrity: sha512-MR04uvD+07cwl/yhVuVWAtw+3GOR/knlL55Nd/wAdblk27GCVt3lqpTivy/tkJcZoNPzTwS1Y+KMojlLDhoTzg==}
+
+  unix-dgram@2.0.7:
+    resolution: {integrity: sha512-pWaQorcdxEUBFIKjCqqIlQaOoNVmchyoaNAJ/1LwyyfK2XSxcBhgJNiSE8ZRhR0xkNGyk4xInt1G03QPoKXY5A==}
+    engines: {node: '>=0.10.48'}
 
   unplugin-utils@0.2.5:
     resolution: {integrity: sha512-gwXJnPRewT4rT7sBi/IvxKTjsms7jX7QIDLOClApuZwR49SXbrB1z2NLUZ+vDHyqCj/n58OzRRqaW+B8OZi8vg==}
@@ -10910,6 +10921,10 @@ snapshots:
 
   hookable@5.5.3: {}
 
+  hot-shots@11.2.0:
+    optionalDependencies:
+      unix-dgram: 2.0.7
+
   html-entities@2.6.0: {}
 
   http-errors@2.0.0:
@@ -13334,6 +13349,12 @@ snapshots:
       '@types/unist': 3.0.3
       unist-util-is: 6.0.0
       unist-util-visit-parents: 6.0.1
+
+  unix-dgram@2.0.7:
+    dependencies:
+      bindings: 1.5.0
+      nan: 2.23.0
+    optional: true
 
   unplugin-utils@0.2.5:
     dependencies:

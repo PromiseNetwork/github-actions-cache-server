@@ -1,9 +1,11 @@
+import type { CacheMetricsTags } from '~/lib/metrics'
 import { Buffer } from 'node:buffer'
+
 import { randomUUID } from 'node:crypto'
-
 import { z } from 'zod'
+import { ENV } from '~/lib/env'
 import { logger } from '~/lib/logger'
-
+import { getMetrics, METRICS } from '~/lib/metrics'
 import { useStorageAdapter } from '~/lib/storage'
 
 // https://github.com/actions/toolkit/blob/340a6b15b5879eefe1412ee6c8606978b091d3e8/packages/cache/src/cache.ts#L470
@@ -59,6 +61,20 @@ export default defineEventHandler(async (event) => {
     chunkStart: start,
     chunkIndex,
   })
+
+  // Record upload chunk metrics
+  if (ENV.METRICS_ENABLED) {
+    try {
+      const metrics = getMetrics()
+      const tags: CacheMetricsTags = {
+        operation: 'upload',
+        storage_driver: ENV.STORAGE_DRIVER,
+      }
+      metrics.increment(METRICS.CACHE.UPLOAD_CHUNKS, 1, tags)
+    } catch (err) {
+      console.warn('Failed to record upload chunk metrics:', err)
+    }
+  }
 
   // prevent random EOF error with in tonistiigi/go-actions-cache caused by missing request id
   setHeader(event, 'x-ms-request-id', randomUUID())
