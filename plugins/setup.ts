@@ -11,10 +11,21 @@ import { useStorageAdapter } from '~/lib/storage'
 function getEndpointName(path: string): string {
   // Normalize dynamic routes for better metric grouping
   return path
-    .replaceAll(/\/\d+/g, '/:id') // Replace numeric IDs
-    .replaceAll(/\/[a-f0-9-]{36}/g, '/:uuid') // Replace UUIDs
-    .replaceAll(/\/[a-f0-9]{8,}/g, '/:hash') // Replace long hashes
-    .replace(/\/_apis\/artifactcache/, '/api/cache') // Simplify API paths
+    .replace(/\/_apis\/artifactcache/, '/api/cache') // Simplify API paths first
+    .split('/')
+    .map((segment) => {
+      if (!segment) return segment
+      // Numeric IDs
+      if (/^\d+$/.test(segment)) return ':id'
+      // UUIDs
+      if (/^[a-f0-9-]{36}$/.test(segment)) return ':uuid'
+      // Long hex strings (cache file names, hashes)
+      if (/^[a-f0-9]{32,}$/.test(segment)) return ':hash'
+      // Long alphanumeric strings (base64, cache keys, etc)
+      if (segment.length > 20 && /^[\w+/=-]+$/.test(segment)) return ':param'
+      return segment
+    })
+    .join('/')
 }
 
 export default defineNitroPlugin(async (nitro) => {
