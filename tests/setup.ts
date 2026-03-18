@@ -80,6 +80,7 @@ export async function setup() {
       .start()
     testContainers.push(container)
     process.env.STORAGE_GCS_BUCKET = 'test'
+    process.env.STORAGE_EMULATOR_HOST = 'localhost:9000'
     process.env.STORAGE_GCS_ENDPOINT = 'http://localhost:9000/storage/v1/'
   }
 
