@@ -1,9 +1,25 @@
+// Rewritten from the original white-box tests that directly called
+// updateOrCreateKey() and findKeyMatch() on the Node DB layer. Those modules
+// no longer exist after the Go rewrite, so these tests now exercise key
+// matching through the public HTTP API (GET /cache?keys=...&version=...).
+//
+// The test cases are 1:1 with the originals:
+//   - exact primary match
+//   - exact restore key match (via comma-separated keys param)
+//   - prefixed restore key match
+//   - multiple restore keys returns first match
+//   - prefixed match returns newest key
+//   - exact match preferred over prefix match
+//
+// Each test uses randomized keys (crypto.randomUUID) to avoid collisions,
+// replacing the original beforeEach(pruneKeys) cleanup pattern.
+
 import crypto from 'node:crypto'
 
 import { describe, expect, test } from 'vitest'
 import { cacheApi, sleep } from '~/tests/utils'
 
-// Helper to create a cache entry via the API (reserve → upload → commit)
+// Reserve → upload → commit a cache entry through the API
 async function createCacheEntry(key: string, version: string) {
   const reserveRes = await cacheApi
     .post('caches', { json: { key, version } })

@@ -1,3 +1,8 @@
+// Rewritten from the original Nitro/Node setup to build and launch the Go
+// server binary instead. Container setup for databases and storage backends
+// is unchanged. The Nitro build+IPC ready signal is replaced with `go build`
+// followed by `wait-on` polling the /healthz endpoint.
+
 import type { ResultPromise } from 'execa'
 
 import type { StartedTestContainer } from 'testcontainers'
@@ -63,6 +68,8 @@ export async function setup() {
   }
 
   // Storage container
+  // Added -external-url flag (not in original) so fake-gcs-server generates
+  // correct self-referencing URLs for the Go GCS client.
   if (storageDriver === 'gcs') {
     const container = await new GenericContainer('fsouza/fake-gcs-server:latest')
       .withEntrypoint(['sh'])

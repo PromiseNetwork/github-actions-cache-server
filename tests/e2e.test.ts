@@ -1,3 +1,14 @@
+// The @actions/cache save/restore tests are unchanged from the original.
+//
+// The "pruning cache" test was rewritten: the original called useStorageAdapter()
+// and used internal methods (reserveCache, uploadChunk, commitCache, getCacheEntry,
+// pruneCaches, driver.createReadStream) which no longer exist after the Go rewrite.
+// It now exercises the same flow through the public HTTP API:
+//   reserve (POST /caches) → upload (PATCH /caches/:id) → commit (POST /caches/:id)
+//   → verify exists (GET /cache) → verify downloadable (GET archiveLocation)
+// The "prune then verify deleted" half was removed because the prune endpoint
+// is an internal cron job, not exposed via the Actions cache API.
+
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'

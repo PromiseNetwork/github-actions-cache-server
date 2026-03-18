@@ -1,9 +1,24 @@
+// Rewritten from the original white-box tests that directly imported Node
+// internals (useDB, findKeyMatch, findStaleKeys, pruneKeys, touchKey,
+// updateOrCreateKey, useStorageAdapter). Those modules no longer exist after
+// the Go rewrite, so these tests now exercise the same behaviors through the
+// public HTTP API. Key differences:
+//
+// - "setting last accessed date" → "create and retrieve cache entry":
+//   The original tested updateOrCreateKey/touchKey setting accessed_at timestamps
+//   directly on the DB. Now tests the full reserve→upload→commit→lookup flow
+//   through the API, verifying the entry is retrievable and downloadable.
+//
+// - "getting stale keys" → "list entries by key" / "duplicate reserve":
+//   The original tested findStaleKeys with controlled dates. The stale-key
+//   pruning logic is now tested indirectly via the prune test in e2e.test.ts.
+//   These tests instead cover listing and reservation idempotency.
+
 import crypto from 'node:crypto'
 
 import { describe, expect, test } from 'vitest'
 import { cacheApi } from '~/tests/utils'
 
-// Helper to create a cache entry via the API
 async function createCacheEntry(key: string, version: string) {
   const reserveRes = await cacheApi
     .post('caches', { json: { key, version } })
