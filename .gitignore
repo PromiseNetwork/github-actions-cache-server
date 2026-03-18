@@ -12,3 +12,8 @@ data/
 .DS_Store
 tests/temp/
 actions-runner/
+
+# Go
+/server
+/cache-server
+*.exe

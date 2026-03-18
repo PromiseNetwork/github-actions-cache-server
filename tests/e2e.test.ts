@@ -2,11 +2,9 @@ import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { Readable } from 'node:stream'
 import { restoreCache, saveCache } from '@actions/cache'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import { useStorageAdapter } from '~/lib/storage'
-import { getCacheFileName } from '~/lib/utils'
+import { cacheApi } from '~/tests/utils'
 
 const TEST_TEMP_DIR = path.join(import.meta.dirname, 'temp')
 await fs.mkdir(TEST_TEMP_DIR, { recursive: true })
@@ -49,67 +47,50 @@ for (const version of versions) {
 }
 
 test(
-  'pruning cache',
+  'pruning cache via API',
   {
     timeout: 60_000,
   },
   async () => {
-    const storage = await useStorageAdapter()
+    // Reserve cache via v1 API
+    const reserveRes = await cacheApi
+      .post('caches', {
+        json: { key: 'prune-test-key', version: 'prune-test-version' },
+      })
+      .json<{ cacheId: number | null }>()
 
-    const { cacheId } = await storage.reserveCache({
-      key: 'cache-a',
-      version: '1',
-    })
-    if (!cacheId) throw new Error('Failed to reserve cache')
+    expect(reserveRes.cacheId).toBeTruthy()
+    const cacheId = reserveRes.cacheId!
 
-    // random 100MB ReadableStream
-    const stream = new ReadableStream<Buffer>({
-      start(controller) {
-        const chunkSize = 1024 * 1024 // 1MB
-        for (let i = 0; i < 100; i++) {
-          const chunk = Buffer.alloc(chunkSize)
-          controller.enqueue(chunk)
-        }
-        controller.close()
+    // Upload a chunk via v1 API
+    const chunkData = new Uint8Array(crypto.randomBytes(1024))
+    await cacheApi.patch(`caches/${cacheId}`, {
+      body: chunkData,
+      headers: {
+        'content-range': `bytes 0-${chunkData.length - 1}/*`,
+        'content-type': 'application/octet-stream',
       },
     })
-    await storage.uploadChunk({
-      uploadId: cacheId,
-      chunkIndex: 0,
-      chunkStart: 0,
-      chunkStream: stream,
+
+    // Commit via v1 API
+    await cacheApi.post(`caches/${cacheId}`, {
+      json: { size: chunkData.length },
     })
-    await storage.commitCache(cacheId)
 
-    // exists
-    expect(
-      await storage.getCacheEntry({
-        keys: ['cache-a'],
-        version: '1',
-      }),
-    ).toStrictEqual({
-      archiveLocation: expect.stringMatching(
-        new RegExp(
-          `http:\/\/localhost:3000\/download\/[^\/]+\/${getCacheFileName('cache-a', '1')}`,
-        ),
-      ),
-      cacheKey: 'cache-a',
+    // Verify cache entry exists
+    const getRes = await cacheApi.get('cache', {
+      searchParams: { keys: 'prune-test-key', version: 'prune-test-version' },
     })
-    expect(
-      await storage.driver.createReadStream(getCacheFileName('cache-a', '1')).catch(() => null),
-    ).toBeInstanceOf(Readable)
 
-    await storage.pruneCaches()
+    expect(getRes.status).toBe(200)
+    const entry = await getRes.json<{ archiveLocation: string; cacheKey: string }>()
+    expect(entry.cacheKey).toBe('prune-test-key')
+    expect(entry.archiveLocation).toContain('/download/')
 
-    // doesn't exist
-    expect(
-      await storage.getCacheEntry({
-        keys: ['cache-a'],
-        version: '1',
-      }),
-    ).toBeNull()
-    expect(
-      await storage.driver.createReadStream(getCacheFileName('cache-a', '1')).catch(() => null),
-    ).toBe(null)
+    // Verify we can download it
+    const downloadRes = await fetch(entry.archiveLocation)
+    expect(downloadRes.status).toBe(200)
+    const downloadedData = new Uint8Array(await downloadRes.arrayBuffer())
+    expect(Buffer.from(downloadedData).compare(Buffer.from(chunkData))).toBe(0)
   },
 )

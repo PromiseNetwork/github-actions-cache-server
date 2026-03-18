@@ -1,0 +1,55 @@
+replicaCount: 2
+
+image:
+  repository: github-actions-cache-server
+  pullPolicy: IfNotPresent
+  tag: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 3000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  API_BASE_URL: ""
+  STORAGE_DRIVER: gcs
+  DB_DRIVER: postgres
+  CACHE_CLEANUP_OLDER_THAN_DAYS: "90"
+  CACHE_CLEANUP_CRON: "0 0 * * *"
+  UPLOAD_CLEANUP_CRON: "*/10 * * * *"
+  ENABLE_DIRECT_DOWNLOADS: "false"
+  METRICS_ENABLED: "true"
+
+secrets:
+  STORAGE_GCS_BUCKET: ""
+  STORAGE_GCS_SERVICE_ACCOUNT_KEY: ""
+  DB_POSTGRES_URL: ""
+  REDIS_URL: ""
+
+redis:
+  enabled: false
+  url: ""
+  ttl: "5m"
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
