@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -23,12 +24,23 @@ type GCSOptions struct {
 }
 
 func NewGCS(ctx context.Context, opts GCSOptions) (*GCSDriver, error) {
+	// Check STORAGE_EMULATOR_HOST if no explicit endpoint is set.
+	// We handle this ourselves rather than letting the library do it,
+	// because the library's emulator mode has issues with fake-gcs-server
+	// (different URL routing for JSON vs XML API reads/writes).
+	endpoint := opts.Endpoint
+	if endpoint == "" {
+		endpoint = os.Getenv("STORAGE_EMULATOR_HOST")
+	}
+	// Unset so the library doesn't also apply its own emulator logic
+	os.Unsetenv("STORAGE_EMULATOR_HOST")
+
 	var clientOpts []option.ClientOption
 	if opts.ServiceAccountKey != "" {
 		clientOpts = append(clientOpts, option.WithCredentialsFile(opts.ServiceAccountKey))
 	}
-	if opts.Endpoint != "" {
-		clientOpts = append(clientOpts, option.WithEndpoint(opts.Endpoint))
+	if endpoint != "" {
+		clientOpts = append(clientOpts, option.WithEndpoint(endpoint))
 		// When using a custom endpoint (e.g., fake-gcs-server), skip authentication
 		if opts.ServiceAccountKey == "" {
 			clientOpts = append(clientOpts, option.WithoutAuthentication())
