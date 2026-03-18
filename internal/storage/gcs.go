@@ -90,13 +90,25 @@ func (g *GCSDriver) CreateDownloadURL(cacheFileName string) (string, error) {
 }
 
 func (g *GCSDriver) UploadPart(uploadID string, partNumber int, data io.Reader) error {
-	obj := g.bucket.Object(g.partObjectName(uploadID, partNumber))
+	name := g.partObjectName(uploadID, partNumber)
+	log.Printf("gcs: uploading part to %s", name)
+	obj := g.bucket.Object(name)
 	w := obj.NewWriter(g.ctx)
-	if _, err := io.Copy(w, data); err != nil {
+	n, err := io.Copy(w, data)
+	if err != nil {
 		w.Close()
 		return fmt.Errorf("upload part %d: %w", partNumber, err)
 	}
-	return w.Close()
+	log.Printf("gcs: wrote %d bytes to %s", n, name)
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("close writer for part %d: %w", partNumber, err)
+	}
+	// Verify the object exists after upload
+	_, err = obj.Attrs(g.ctx)
+	if err != nil {
+		log.Printf("gcs: WARNING - part %s not found after upload: %v", name, err)
+	}
+	return nil
 }
 
 func (g *GCSDriver) CompleteMultipartUpload(cacheFileName, uploadID string, partNumbers []int) error {
