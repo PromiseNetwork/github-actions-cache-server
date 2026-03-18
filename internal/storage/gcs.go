@@ -64,12 +64,15 @@ func (g *GCSDriver) Delete(cacheFileNames []string) error {
 }
 
 func (g *GCSDriver) CreateReadStream(cacheFileName string) (io.ReadCloser, error) {
-	obj := g.bucket.Object(g.objectName(cacheFileName))
+	objName := g.objectName(cacheFileName)
+	obj := g.bucket.Object(objName)
 	reader, err := obj.NewReader(g.ctx)
 	if err == storage.ErrObjectNotExist {
+		log.Printf("gcs: object not found: %s", objName)
 		return nil, nil
 	}
 	if err != nil {
+		log.Printf("gcs: error reading object %s: %v", objName, err)
 		return nil, err
 	}
 	return reader, nil
@@ -172,14 +175,11 @@ func (g *GCSDriver) CompleteMultipartUpload(cacheFileName, uploadID string, part
 
 	// If only one source, copy it to destination
 	if len(sources) == 1 && sources[0] != dst {
-		// Try copy first; fall back to download+reupload if copy fails
-		// (some GCS emulators don't support Copy/Compose)
-		copier := dst.CopierFrom(sources[0])
-		if _, err := copier.Run(g.ctx); err != nil {
-			log.Printf("gcs copy failed, falling back to download+reupload: %v", err)
-			if fallbackErr := g.fallbackCopy(sources[0], dst); fallbackErr != nil {
-				return fmt.Errorf("fallback copy: %w", fallbackErr)
-			}
+		// Always use fallback (download+reupload) for maximum compatibility
+		// with emulators like fake-gcs-server
+		log.Printf("gcs: copying single part to %s", g.objectName(cacheFileName))
+		if err := g.fallbackCopy(sources[0], dst); err != nil {
+			return fmt.Errorf("copy to destination: %w", err)
 		}
 	}
 
