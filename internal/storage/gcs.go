@@ -28,6 +28,10 @@ func NewGCS(ctx context.Context, opts GCSOptions) (*GCSDriver, error) {
 	}
 	if opts.Endpoint != "" {
 		clientOpts = append(clientOpts, option.WithEndpoint(opts.Endpoint))
+		// When using a custom endpoint (e.g., fake-gcs-server), skip authentication
+		if opts.ServiceAccountKey == "" {
+			clientOpts = append(clientOpts, option.WithoutAuthentication())
+		}
 	}
 
 	client, err := storage.NewClient(ctx, clientOpts...)
