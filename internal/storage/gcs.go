@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -40,11 +41,6 @@ func NewGCS(ctx context.Context, opts GCSOptions) (*GCSDriver, error) {
 	}
 
 	bucket := client.Bucket(opts.Bucket)
-
-	// Verify bucket access
-	if _, err := bucket.Attrs(ctx); err != nil {
-		return nil, fmt.Errorf("access bucket %s: %w", opts.Bucket, err)
-	}
 
 	return &GCSDriver{bucket: bucket, ctx: ctx}, nil
 }
@@ -141,7 +137,25 @@ func (g *GCSDriver) CompleteMultipartUpload(cacheFileName, uploadID string, part
 
 			composer := target.ComposerFrom(batch...)
 			if _, err := composer.Run(g.ctx); err != nil {
-				return fmt.Errorf("compose batch at %d: %w", i, err)
+				// Fallback: download all batch parts and reupload
+				log.Printf("gcs compose failed, falling back to download+reupload: %v", err)
+				writer := target.NewWriter(g.ctx)
+				for _, src := range batch {
+					reader, rerr := src.NewReader(g.ctx)
+					if rerr != nil {
+						writer.Close()
+						return fmt.Errorf("fallback read: %w", rerr)
+					}
+					if _, cerr := io.Copy(writer, reader); cerr != nil {
+						reader.Close()
+						writer.Close()
+						return fmt.Errorf("fallback write: %w", cerr)
+					}
+					reader.Close()
+				}
+				if werr := writer.Close(); werr != nil {
+					return fmt.Errorf("fallback close writer: %w", werr)
+				}
 			}
 
 			if target != dst {
@@ -158,13 +172,34 @@ func (g *GCSDriver) CompleteMultipartUpload(cacheFileName, uploadID string, part
 
 	// If only one source, copy it to destination
 	if len(sources) == 1 && sources[0] != dst {
+		// Try copy first; fall back to download+reupload if copy fails
+		// (some GCS emulators don't support Copy/Compose)
 		copier := dst.CopierFrom(sources[0])
 		if _, err := copier.Run(g.ctx); err != nil {
-			return fmt.Errorf("copy single part to dest: %w", err)
+			log.Printf("gcs copy failed, falling back to download+reupload: %v", err)
+			if fallbackErr := g.fallbackCopy(sources[0], dst); fallbackErr != nil {
+				return fmt.Errorf("fallback copy: %w", fallbackErr)
+			}
 		}
 	}
 
 	return g.CleanupMultipartUpload(uploadID)
+}
+
+// fallbackCopy downloads src and re-uploads to dst for emulators that don't support Copy/Compose.
+func (g *GCSDriver) fallbackCopy(src, dst *storage.ObjectHandle) error {
+	reader, err := src.NewReader(g.ctx)
+	if err != nil {
+		return fmt.Errorf("read source: %w", err)
+	}
+	defer reader.Close()
+
+	writer := dst.NewWriter(g.ctx)
+	if _, err := io.Copy(writer, reader); err != nil {
+		writer.Close()
+		return fmt.Errorf("write dest: %w", err)
+	}
+	return writer.Close()
 }
 
 func (g *GCSDriver) CleanupMultipartUpload(uploadID string) error {
