@@ -143,6 +143,8 @@ func newDB(cfg *config.Config) (db.DB, error) {
 			return nil, fmt.Errorf("DATABASE_URL is required for postgres driver")
 		}
 		return db.NewPostgres(connStr)
+	case "mysql":
+		return db.NewMySQL(cfg.MySQLHost, cfg.MySQLPort, cfg.MySQLUser, cfg.MySQLPassword, cfg.MySQLDatabase)
 	default:
 		return nil, fmt.Errorf("unsupported db driver: %s", cfg.DBDriver)
 	}
@@ -158,6 +160,8 @@ func newStorage(ctx context.Context, cfg *config.Config) (storage.StorageDriver,
 			ServiceAccountKey: os.Getenv("STORAGE_GCS_SERVICE_ACCOUNT_KEY"),
 			Endpoint:          os.Getenv("STORAGE_GCS_ENDPOINT"),
 		})
+	case "s3":
+		return storage.NewS3(ctx, cfg.S3Bucket)
 	default:
 		return nil, fmt.Errorf("unsupported storage driver: %s", cfg.StorageDriver)
 	}

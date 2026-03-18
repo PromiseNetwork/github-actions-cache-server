@@ -22,6 +22,12 @@ type Config struct {
 	MetricsEnabled         bool
 	RedisURL               string
 	RedisTTL               time.Duration
+	S3Bucket               string // STORAGE_S3_BUCKET
+	MySQLDatabase          string // DB_MYSQL_DATABASE
+	MySQLHost              string // DB_MYSQL_HOST
+	MySQLUser              string // DB_MYSQL_USER
+	MySQLPassword          string // DB_MYSQL_PASSWORD
+	MySQLPort              string // DB_MYSQL_PORT
 }
 
 func Load() (*Config, error) {
@@ -49,6 +55,12 @@ func Load() (*Config, error) {
 		MetricsEnabled:        envBool("METRICS_ENABLED", true),
 		RedisURL:              os.Getenv("REDIS_URL"),
 		RedisTTL:              envDuration("REDIS_TTL", 5*time.Minute),
+		S3Bucket:              os.Getenv("STORAGE_S3_BUCKET"),
+		MySQLDatabase:         os.Getenv("DB_MYSQL_DATABASE"),
+		MySQLHost:             os.Getenv("DB_MYSQL_HOST"),
+		MySQLUser:             os.Getenv("DB_MYSQL_USER"),
+		MySQLPassword:         os.Getenv("DB_MYSQL_PASSWORD"),
+		MySQLPort:             os.Getenv("DB_MYSQL_PORT"),
 	}, nil
 }
 

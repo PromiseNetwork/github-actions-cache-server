@@ -3,6 +3,7 @@ import type { ResultPromise } from 'execa'
 import type { StartedTestContainer } from 'testcontainers'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { MySqlContainer } from '@testcontainers/mysql'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 
 import { configDotenv } from 'dotenv'
@@ -11,8 +12,8 @@ import { execa } from 'execa'
 import { GenericContainer } from 'testcontainers'
 import waitOn from 'wait-on'
 
-type DBDriver = 'sqlite' | 'postgres'
-type StorageDriver = 'filesystem' | 'gcs'
+type DBDriver = 'sqlite' | 'postgres' | 'mysql'
+type StorageDriver = 'filesystem' | 'gcs' | 's3'
 
 let server: ResultPromise
 const testContainers: (StartedTestContainer | undefined)[] = []
@@ -47,6 +48,19 @@ export async function setup() {
     process.env.DATABASE_URL =
       'postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable'
   }
+  if (dbDriver === 'mysql') {
+    const container = await new MySqlContainer('mysql:latest')
+      .withDatabase('mysql')
+      .withRootPassword('root')
+      .withExposedPorts({ host: 3306, container: 3306 })
+      .start()
+    testContainers.push(container)
+    process.env.DB_MYSQL_DATABASE = 'mysql'
+    process.env.DB_MYSQL_HOST = 'localhost'
+    process.env.DB_MYSQL_USER = 'root'
+    process.env.DB_MYSQL_PASSWORD = 'root'
+    process.env.DB_MYSQL_PORT = '3306'
+  }
 
   // Storage container
   if (storageDriver === 'gcs') {
@@ -67,6 +81,26 @@ export async function setup() {
     testContainers.push(container)
     process.env.STORAGE_GCS_BUCKET = 'test'
     process.env.STORAGE_GCS_ENDPOINT = 'http://localhost:9000/storage/v1/'
+  }
+
+  if (storageDriver === 's3') {
+    const container = await new GenericContainer('quay.io/minio/minio:latest')
+      .withEntrypoint(['sh'])
+      .withCommand(['-c', 'mkdir -p /data/test && /usr/bin/minio server /data'])
+      .withExposedPorts({ container: 9000, host: 9000 })
+      .withHealthCheck({
+        test: ['CMD-SHELL', 'curl --fail http://localhost:9000/minio/health/ready'],
+        interval: 1000,
+        retries: 30,
+        startPeriod: 1000,
+      })
+      .start()
+    testContainers.push(container)
+    process.env.STORAGE_S3_BUCKET = 'test'
+    process.env.AWS_ENDPOINT_URL = 'http://localhost:9000'
+    process.env.AWS_ACCESS_KEY_ID = 'minioadmin'
+    process.env.AWS_SECRET_ACCESS_KEY = 'minioadmin'
+    process.env.AWS_REGION = 'us-east-1'
   }
 
   // Build Go binary
