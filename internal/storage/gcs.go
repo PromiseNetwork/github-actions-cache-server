@@ -25,15 +25,10 @@ type GCSOptions struct {
 
 func NewGCS(ctx context.Context, opts GCSOptions) (*GCSDriver, error) {
 	// Check STORAGE_EMULATOR_HOST if no explicit endpoint is set.
-	// We handle this ourselves rather than letting the library do it,
-	// because the library's emulator mode has issues with fake-gcs-server
-	// (different URL routing for JSON vs XML API reads/writes).
 	endpoint := opts.Endpoint
 	if endpoint == "" {
 		endpoint = os.Getenv("STORAGE_EMULATOR_HOST")
 	}
-	// Unset so the library doesn't also apply its own emulator logic
-	os.Unsetenv("STORAGE_EMULATOR_HOST")
 
 	var clientOpts []option.ClientOption
 	if opts.ServiceAccountKey != "" {
@@ -45,6 +40,9 @@ func NewGCS(ctx context.Context, opts GCSOptions) (*GCSDriver, error) {
 		if opts.ServiceAccountKey == "" {
 			clientOpts = append(clientOpts, option.WithoutAuthentication())
 		}
+		// Force JSON API for reads. The default XML API URL-encodes slashes
+		// in object names (%2F), which emulators like fake-gcs-server don't handle.
+		clientOpts = append(clientOpts, storage.WithJSONReads())
 	}
 
 	client, err := storage.NewClient(ctx, clientOpts...)
