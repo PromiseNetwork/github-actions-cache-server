@@ -24,24 +24,20 @@ type GCSOptions struct {
 }
 
 func NewGCS(ctx context.Context, opts GCSOptions) (*GCSDriver, error) {
-	// Check STORAGE_EMULATOR_HOST if no explicit endpoint is set.
-	endpoint := opts.Endpoint
-	if endpoint == "" {
-		endpoint = os.Getenv("STORAGE_EMULATOR_HOST")
-	}
-
 	var clientOpts []option.ClientOption
 	if opts.ServiceAccountKey != "" {
 		clientOpts = append(clientOpts, option.WithCredentialsFile(opts.ServiceAccountKey))
 	}
-	if endpoint != "" {
-		clientOpts = append(clientOpts, option.WithEndpoint(endpoint))
-		// When using a custom endpoint (e.g., fake-gcs-server), skip authentication
+	if opts.Endpoint != "" {
+		clientOpts = append(clientOpts, option.WithEndpoint(opts.Endpoint))
 		if opts.ServiceAccountKey == "" {
 			clientOpts = append(clientOpts, option.WithoutAuthentication())
 		}
-		// Force JSON API for reads. The default XML API URL-encodes slashes
-		// in object names (%2F), which emulators like fake-gcs-server don't handle.
+	}
+	// When using an emulator (STORAGE_EMULATOR_HOST), the library handles endpoint
+	// and auth automatically. We just need to force JSON reads because the default
+	// XML API URL-encodes slashes in object names, which emulators don't handle.
+	if os.Getenv("STORAGE_EMULATOR_HOST") != "" || opts.Endpoint != "" {
 		clientOpts = append(clientOpts, storage.WithJSONReads())
 	}
 
