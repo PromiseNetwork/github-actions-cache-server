@@ -68,7 +68,7 @@ export async function setup() {
       .withEntrypoint(['sh'])
       .withCommand([
         `-c`,
-        `mkdir -p /data/test && /bin/fake-gcs-server -scheme http -port 9000 -data /data`,
+        `mkdir -p /data/test && /bin/fake-gcs-server -scheme http -port 9000 -external-url http://localhost:9000 -data /data`,
       ])
       .withExposedPorts({ container: 9000, host: 9000 })
       .withHealthCheck({
@@ -80,8 +80,7 @@ export async function setup() {
       .start()
     testContainers.push(container)
     process.env.STORAGE_GCS_BUCKET = 'test'
-    process.env.STORAGE_EMULATOR_HOST = 'localhost:9000'
-    process.env.STORAGE_GCS_ENDPOINT = 'http://localhost:9000/storage/v1/'
+    process.env.STORAGE_EMULATOR_HOST = 'http://localhost:9000'
   }
 
   if (storageDriver === 's3') {
