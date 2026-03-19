@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/promisenetwork/github-actions-cache-server/internal/cache"
@@ -23,7 +23,7 @@ func handleV2CreateCacheEntry(svc cache.Service, cfg *config.Config) http.Handle
 
 		cacheID, err := svc.ReserveCache(r.Context(), body.Key, body.Version)
 		if err != nil {
-			log.Printf("error reserving cache: %v", err)
+			slog.Error("error reserving cache", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -54,7 +54,7 @@ func handleV2FinalizeCacheEntry(svc cache.Service) http.HandlerFunc {
 
 		upload, err := svc.GetDB().GetUpload(r.Context(), body.Key, body.Version)
 		if err != nil {
-			log.Printf("error getting upload: %v", err)
+			slog.Error("error getting upload", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -64,7 +64,7 @@ func handleV2FinalizeCacheEntry(svc cache.Service) http.HandlerFunc {
 		}
 
 		if err := svc.CommitCache(r.Context(), upload.ID); err != nil {
-			log.Printf("error committing cache: %v", err)
+			slog.Error("error committing cache", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -94,7 +94,7 @@ func handleV2GetCacheEntryDownloadURL(svc cache.Service) http.HandlerFunc {
 
 		entry, err := svc.GetCacheEntry(r.Context(), keys, body.Version)
 		if err != nil {
-			log.Printf("error getting cache entry: %v", err)
+			slog.Error("error getting cache entry", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}

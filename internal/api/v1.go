@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,7 +25,7 @@ func handleGetCacheEntry(svc cache.Service) http.HandlerFunc {
 
 		entry, err := svc.GetCacheEntry(r.Context(), keys, version)
 		if err != nil {
-			log.Printf("error getting cache entry: %v", err)
+			slog.Error("error getting cache entry", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -49,7 +49,7 @@ func handleListEntries(svc cache.Service) http.HandlerFunc {
 
 		entries, err := svc.GetDB().ListEntriesByKey(r.Context(), key)
 		if err != nil {
-			log.Printf("error listing entries: %v", err)
+			slog.Error("error listing entries", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -95,7 +95,7 @@ func handleReserveCache(svc cache.Service) http.HandlerFunc {
 
 		cacheID, err := svc.ReserveCache(r.Context(), body.Key, body.Version)
 		if err != nil {
-			log.Printf("error reserving cache: %v", err)
+			slog.Error("error reserving cache", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -134,7 +134,7 @@ func handleUploadChunk(svc cache.Service) http.HandlerFunc {
 		}
 
 		if err := svc.UploadChunk(r.Context(), cacheID, r.Body, chunkIndex); err != nil {
-			log.Printf("error uploading chunk: %v", err)
+			slog.Error("error uploading chunk", "cache_id", cacheID, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -148,7 +148,7 @@ func handleCommitCache(svc cache.Service) http.HandlerFunc {
 		cacheID := r.PathValue("cacheId")
 
 		if err := svc.CommitCache(r.Context(), cacheID); err != nil {
-			log.Printf("error committing cache: %v", err)
+			slog.Error("error committing cache", "cache_id", cacheID, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}

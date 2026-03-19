@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math/big"
 	"time"
 
@@ -145,7 +145,7 @@ func (s *CacheService) GetCacheEntry(ctx context.Context, keys []string, version
 	}
 
 	if err := s.DB.TouchKey(ctx, cacheKey.Key, cacheKey.Version); err != nil {
-		log.Printf("warning: failed to touch key: %v", err)
+		slog.Warn("failed to touch key", "key", cacheKey.Key, "error", err)
 	}
 
 	cacheFileName := db.CacheFileName(cacheKey.Key, cacheKey.Version)
@@ -203,10 +203,10 @@ func (s *CacheService) PruneUploads(ctx context.Context, olderThan time.Duration
 
 	for _, u := range uploads {
 		if err := s.Storage.CleanupMultipartUpload(u.ID); err != nil {
-			log.Printf("warning: failed to cleanup upload %s: %v", u.ID, err)
+			slog.Warn("failed to cleanup upload", "upload_id", u.ID, "error", err)
 		}
 		if err := s.DB.DeleteUpload(ctx, u.ID); err != nil {
-			log.Printf("warning: failed to delete upload %s: %v", u.ID, err)
+			slog.Warn("failed to delete upload", "upload_id", u.ID, "error", err)
 		}
 	}
 

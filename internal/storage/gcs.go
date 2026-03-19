@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -74,11 +74,11 @@ func (g *GCSDriver) CreateReadStream(cacheFileName string) (io.ReadCloser, error
 	obj := g.bucket.Object(objName)
 	reader, err := obj.NewReader(g.ctx)
 	if err == storage.ErrObjectNotExist {
-		log.Printf("gcs: object not found: %s", objName)
+		slog.Debug("gcs object not found", "object", objName)
 		return nil, nil
 	}
 	if err != nil {
-		log.Printf("gcs: error reading object %s: %v", objName, err)
+		slog.Error("gcs error reading object", "object", objName, "error", err)
 		return nil, err
 	}
 	return reader, nil
@@ -97,7 +97,7 @@ func (g *GCSDriver) CreateDownloadURL(cacheFileName string) (string, error) {
 
 func (g *GCSDriver) UploadPart(uploadID string, partNumber int, data io.Reader) error {
 	name := g.partObjectName(uploadID, partNumber)
-	log.Printf("gcs: uploading part to %s", name)
+	slog.Debug("gcs uploading part", "object", name)
 	obj := g.bucket.Object(name)
 	w := obj.NewWriter(g.ctx)
 	n, err := io.Copy(w, data)
@@ -105,14 +105,14 @@ func (g *GCSDriver) UploadPart(uploadID string, partNumber int, data io.Reader) 
 		w.Close()
 		return fmt.Errorf("upload part %d: %w", partNumber, err)
 	}
-	log.Printf("gcs: wrote %d bytes to %s", n, name)
+	slog.Debug("gcs wrote bytes", "object", name, "bytes", n)
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("close writer for part %d: %w", partNumber, err)
 	}
 	// Verify the object exists after upload
 	_, err = obj.Attrs(g.ctx)
 	if err != nil {
-		log.Printf("gcs: WARNING - part %s not found after upload: %v", name, err)
+		slog.Warn("gcs part not found after upload", "object", name, "error", err)
 	}
 	return nil
 }
@@ -159,7 +159,7 @@ func (g *GCSDriver) CompleteMultipartUpload(cacheFileName, uploadID string, part
 			composer := target.ComposerFrom(batch...)
 			if _, err := composer.Run(g.ctx); err != nil {
 				// Fallback: download all batch parts and reupload
-				log.Printf("gcs compose failed, falling back to download+reupload: %v", err)
+				slog.Warn("gcs compose failed, falling back to download+reupload", "error", err)
 				writer := target.NewWriter(g.ctx)
 				for _, src := range batch {
 					reader, rerr := src.NewReader(g.ctx)
@@ -193,9 +193,7 @@ func (g *GCSDriver) CompleteMultipartUpload(cacheFileName, uploadID string, part
 
 	// If only one source, copy it to destination
 	if len(sources) == 1 && sources[0] != dst {
-		// Always use fallback (download+reupload) for maximum compatibility
-		// with emulators like fake-gcs-server
-		log.Printf("gcs: copying single part to %s", g.objectName(cacheFileName))
+		slog.Debug("gcs copying single part to destination", "object", g.objectName(cacheFileName))
 		if err := g.fallbackCopy(sources[0], dst); err != nil {
 			return fmt.Errorf("copy to destination: %w", err)
 		}

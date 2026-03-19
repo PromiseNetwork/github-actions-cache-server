@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -45,7 +45,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		sr := &statusRecorder{ResponseWriter: w, statusCode: http.StatusOK}
 		next.ServeHTTP(sr, r)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, sr.statusCode, time.Since(start).Round(time.Millisecond))
+		slog.Info("request", "method", r.Method, "path", r.URL.Path, "status", sr.statusCode, "duration", time.Since(start).Round(time.Millisecond).String())
 	})
 }
 
@@ -63,7 +63,7 @@ func metricsMiddleware(next http.Handler) http.Handler {
 
 func debugLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("DEBUG request: %s %s headers=%v", r.Method, r.URL.String(), r.Header)
+		slog.Debug("request", "method", r.Method, "url", r.URL.String())
 		next.ServeHTTP(w, r)
 	})
 }

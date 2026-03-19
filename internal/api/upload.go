@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -42,7 +42,7 @@ func handleBlobUpload(svc cache.Service) http.HandlerFunc {
 		}
 
 		if err := svc.UploadChunk(r.Context(), cacheID, r.Body, chunkIndex); err != nil {
-			log.Printf("error uploading chunk: %v", err)
+			slog.Error("error uploading chunk", "cache_id", cacheID, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}

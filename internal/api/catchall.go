@@ -2,7 +2,7 @@ package api
 
 import (
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -10,7 +10,7 @@ const defaultActionsResultsURL = "https://results-receiver.actions.githubusercon
 
 func handleCatchAll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("proxying unknown path %s to %s", r.URL.Path, defaultActionsResultsURL)
+		slog.Info("proxying unknown path", "path", r.URL.Path, "target", defaultActionsResultsURL)
 
 		proxyURL := defaultActionsResultsURL + r.URL.Path
 		if r.URL.RawQuery != "" {
@@ -32,7 +32,7 @@ func handleCatchAll() http.HandlerFunc {
 
 		resp, err := http.DefaultClient.Do(proxyReq)
 		if err != nil {
-			log.Printf("proxy error: %v", err)
+			slog.Error("proxy error", "path", r.URL.Path, "error", err)
 			http.Error(w, "proxy error", http.StatusBadGateway)
 			return
 		}

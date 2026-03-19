@@ -2,7 +2,7 @@ package api
 
 import (
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/promisenetwork/github-actions-cache-server/internal/cache"
@@ -14,7 +14,7 @@ func handleDownload(svc cache.Service) http.HandlerFunc {
 
 		reader, err := svc.Download(cacheFileName)
 		if err != nil {
-			log.Printf("error downloading cache: %v", err)
+			slog.Error("error downloading cache", "file", cacheFileName, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
