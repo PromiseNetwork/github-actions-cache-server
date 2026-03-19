@@ -53,16 +53,36 @@ func TestReserveCache(t *testing.T) {
 		t.Fatal("expected non-zero upload ID")
 	}
 
-	// Second reserve with same key+version should replace the stale upload
+	// Second reserve with same key+version should return 0 (upload is still fresh)
 	id2, err := svc.ReserveCache(ctx, "key1", "v1")
 	if err != nil {
 		t.Fatalf("ReserveCache second: %v", err)
 	}
-	if id2 == 0 {
-		t.Error("expected non-zero ID for re-reserve (stale upload should be replaced)")
+	if id2 != 0 {
+		t.Errorf("expected 0 for duplicate reserve, got %d", id2)
 	}
-	if id2 == id {
-		t.Error("expected different upload ID after re-reserve")
+}
+
+func TestReserveCacheReplacesStaleUpload(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	// Create an upload with an old timestamp to simulate a stale upload
+	oldTime := time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339)
+	svc.DB.CreateUpload(ctx, db.Upload{
+		ID:        "stale-reserve",
+		CreatedAt: oldTime,
+		Key:       "stale-key",
+		Version:   "v1",
+	})
+
+	// Reserve with same key+version should replace the stale upload
+	id, err := svc.ReserveCache(ctx, "stale-key", "v1")
+	if err != nil {
+		t.Fatalf("ReserveCache: %v", err)
+	}
+	if id == 0 {
+		t.Error("expected non-zero ID, stale upload should have been replaced")
 	}
 }
 

@@ -40,16 +40,24 @@ type CacheService struct {
 	EnableDirectDownloads bool
 }
 
+// staleUploadThreshold is the age after which an in-progress upload is
+// considered abandoned and can be replaced by a new reserve.
+const staleUploadThreshold = 5 * time.Minute
+
 // ReserveCache creates a new upload reservation. Returns the upload ID,
-// or 0 if the cache is already reserved.
-// If a stale upload exists for the same key+version, it is replaced.
+// or 0 if the cache is already reserved. Stale uploads older than
+// staleUploadThreshold are automatically replaced.
 func (s *CacheService) ReserveCache(ctx context.Context, key, version string) (int64, error) {
 	existing, err := s.DB.GetUpload(ctx, key, version)
 	if err != nil {
 		return 0, fmt.Errorf("check existing upload: %w", err)
 	}
 	if existing != nil {
-		slog.Info("replacing stale upload", "key", key, "version", version, "upload_id", existing.ID)
+		createdAt, err := time.Parse(time.RFC3339, existing.CreatedAt)
+		if err != nil || time.Since(createdAt) < staleUploadThreshold {
+			return 0, nil
+		}
+		slog.Info("replacing stale upload", "key", key, "version", version, "upload_id", existing.ID, "age", time.Since(createdAt).Round(time.Second))
 		if err := s.Storage.CleanupMultipartUpload(existing.ID); err != nil {
 			slog.Warn("failed to cleanup stale upload parts", "upload_id", existing.ID, "error", err)
 		}
