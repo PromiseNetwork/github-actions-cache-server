@@ -87,11 +87,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     entrypoint:
-      [
-        sh,
-        -c,
-        "while true; do echo '---'; date -u +%H:%M:%S; docker stats --no-stream --format 'table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.NetIO}}' | grep -E '(NAME|go-server|node-server|postgres|redis)'; sleep 5; done",
-      ]
+      - sh
+      - -c
+      - "while true; do echo '---'; date -u +%H:%M:%S; docker stats --no-stream --format 'table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.NetIO}}' | grep -E '(NAME|go-server|node-server|postgres|redis)'; sleep 5; done"
     depends_on:
       - go-server
       - node-server
