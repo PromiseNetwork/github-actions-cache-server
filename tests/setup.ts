@@ -50,7 +50,7 @@ export async function setup() {
       .withExposedPorts({ host: 5432, container: 5432 })
       .start()
     testContainers.push(container)
-    process.env.DATABASE_URL =
+    process.env.DB_POSTGRES_URL =
       'postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable'
   }
   if (dbDriver === 'mysql') {
