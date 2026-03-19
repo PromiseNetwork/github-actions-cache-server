@@ -646,6 +646,26 @@ func TestDownload_NotFound(t *testing.T) {
 
 // --- Health Tests ---
 
+func TestRootHealth(t *testing.T) {
+	svc := &mockService{db: &mockDB{}}
+	ts := newTestServer(svc)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "ok" {
+		t.Errorf("expected body 'ok', got %s", body)
+	}
+}
+
 func TestHealthz(t *testing.T) {
 	svc := &mockService{db: &mockDB{}}
 	ts := newTestServer(svc)
