@@ -42,13 +42,20 @@ type CacheService struct {
 
 // ReserveCache creates a new upload reservation. Returns the upload ID,
 // or 0 if the cache is already reserved.
+// If a stale upload exists for the same key+version, it is replaced.
 func (s *CacheService) ReserveCache(ctx context.Context, key, version string) (int64, error) {
 	existing, err := s.DB.GetUpload(ctx, key, version)
 	if err != nil {
 		return 0, fmt.Errorf("check existing upload: %w", err)
 	}
 	if existing != nil {
-		return 0, nil
+		slog.Info("replacing stale upload", "key", key, "version", version, "upload_id", existing.ID)
+		if err := s.Storage.CleanupMultipartUpload(existing.ID); err != nil {
+			slog.Warn("failed to cleanup stale upload parts", "upload_id", existing.ID, "error", err)
+		}
+		if err := s.DB.DeleteUpload(ctx, existing.ID); err != nil {
+			return 0, fmt.Errorf("delete stale upload: %w", err)
+		}
 	}
 
 	uploadID, err := randomUploadID()

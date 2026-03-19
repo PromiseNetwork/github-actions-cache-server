@@ -53,13 +53,16 @@ func TestReserveCache(t *testing.T) {
 		t.Fatal("expected non-zero upload ID")
 	}
 
-	// Second reserve with same key+version should return 0
+	// Second reserve with same key+version should replace the stale upload
 	id2, err := svc.ReserveCache(ctx, "key1", "v1")
 	if err != nil {
 		t.Fatalf("ReserveCache second: %v", err)
 	}
-	if id2 != 0 {
-		t.Errorf("expected 0 for duplicate reserve, got %d", id2)
+	if id2 == 0 {
+		t.Error("expected non-zero ID for re-reserve (stale upload should be replaced)")
+	}
+	if id2 == id {
+		t.Error("expected different upload ID after re-reserve")
 	}
 }
 
