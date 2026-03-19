@@ -41,7 +41,7 @@ services:
       STORAGE_DRIVER: filesystem
       STORAGE_FILESYSTEM_PATH: /tmp/storage
       DB_DRIVER: postgres
-      DATABASE_URL: postgres://cache:cache@go-postgres:5432/cache?sslmode=disable
+      DB_POSTGRES_URL: postgres://cache:cache@go-postgres:5432/cache?sslmode=disable
       REDIS_URL: redis://go-redis:6379
       PORT: '3000'
     tmpfs:

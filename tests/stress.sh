@@ -256,7 +256,7 @@ API_BASE_URL="$BASE_URL" \
 STORAGE_DRIVER=filesystem \
 STORAGE_FILESYSTEM_PATH=.data/bench-storage \
 DB_DRIVER=sqlite \
-SQLITE_PATH=.data/bench-cache.db \
+DB_SQLITE_PATH=.data/bench-cache.db \
 PORT="$PORT" \
 .output/cache-server &>/dev/null &
 SERVER_PID=$!
@@ -276,7 +276,7 @@ API_BASE_URL="$BASE_URL" \
 STORAGE_DRIVER=filesystem \
 STORAGE_FILESYSTEM_PATH=.data/bench-storage \
 DB_DRIVER=sqlite \
-SQLITE_PATH=.data/bench-cache.db \
+DB_SQLITE_PATH=.data/bench-cache.db \
 NITRO_PORT="$PORT" \
 node .output/server/index.mjs &>/dev/null &
 SERVER_PID=$!

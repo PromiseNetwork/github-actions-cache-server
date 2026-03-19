@@ -132,15 +132,15 @@ func main() {
 func newDB(cfg *config.Config) (db.DB, error) {
 	switch cfg.DBDriver {
 	case "sqlite":
-		path := os.Getenv("SQLITE_PATH")
+		path := os.Getenv("DB_SQLITE_PATH")
 		if path == "" {
-			path = ".data/cache.db"
+			path = ".data/sqlite.db"
 		}
 		return db.NewSQLite(path)
 	case "postgres":
-		connStr := os.Getenv("DATABASE_URL")
+		connStr := os.Getenv("DB_POSTGRES_URL")
 		if connStr == "" {
-			return nil, fmt.Errorf("DATABASE_URL is required for postgres driver")
+			return nil, fmt.Errorf("DB_POSTGRES_URL is required for postgres driver")
 		}
 		return db.NewPostgres(connStr)
 	case "mysql":

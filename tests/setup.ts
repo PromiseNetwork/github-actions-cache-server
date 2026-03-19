@@ -130,7 +130,7 @@ export async function setup() {
   }
 
   if (dbDriver === 'sqlite') {
-    env.SQLITE_PATH = '.data/test-cache.db'
+    env.DB_SQLITE_PATH = '.data/test-cache.db'
   }
 
   // Start Go server

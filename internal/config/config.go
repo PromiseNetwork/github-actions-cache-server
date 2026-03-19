@@ -52,7 +52,7 @@ func Load() (*Config, error) {
 		UploadCleanupCron:     envStr("UPLOAD_CLEANUP_CRON", "*/10 * * * *"),
 		EnableDirectDownloads: envBool("ENABLE_DIRECT_DOWNLOADS", false),
 		TempDir:               envStr("TEMP_DIR", os.TempDir()),
-		MetricsEnabled:        envBool("METRICS_ENABLED", true),
+		MetricsEnabled:        envBool("METRICS_ENABLED", false),
 		RedisURL:              os.Getenv("REDIS_URL"),
 		RedisTTL:              envDuration("REDIS_TTL", 5*time.Minute),
 		S3Bucket:              os.Getenv("STORAGE_S3_BUCKET"),

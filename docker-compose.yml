@@ -15,7 +15,7 @@ services:
       STORAGE_GCS_BUCKET: test-bucket
       STORAGE_GCS_ENDPOINT: http://fake-gcs:4443/storage/v1/
       DB_DRIVER: postgres
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      DB_POSTGRES_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
       REDIS_URL: redis://redis:6379
       DEBUG: 'true'
 
