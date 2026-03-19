@@ -1,0 +1,97 @@
+services:
+  go-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cache
+      POSTGRES_PASSWORD: cache
+      POSTGRES_DB: cache
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U cache]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+  node-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cache
+      POSTGRES_PASSWORD: cache
+      POSTGRES_DB: cache
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U cache]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+  go-redis:
+    image: redis:7-alpine
+
+  go-server:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - '3001:3000'
+    environment:
+      API_BASE_URL: http://localhost:3001
+      STORAGE_DRIVER: filesystem
+      STORAGE_FILESYSTEM_PATH: /tmp/storage
+      DB_DRIVER: postgres
+      DATABASE_URL: postgres://cache:cache@go-postgres:5432/cache?sslmode=disable
+      REDIS_URL: redis://go-redis:6379
+      PORT: '3000'
+    tmpfs:
+      - /tmp
+    depends_on:
+      go-postgres:
+        condition: service_healthy
+      go-redis:
+        condition: service_started
+
+  node-server:
+    build:
+      dockerfile: Dockerfile.node
+      context: .
+    ports:
+      - '3002:3000'
+    environment:
+      API_BASE_URL: http://localhost:3002
+      STORAGE_DRIVER: filesystem
+      STORAGE_FILESYSTEM_PATH: /tmp/storage
+      DB_DRIVER: postgres
+      DB_POSTGRES_URL: postgres://cache:cache@node-postgres:5432/cache?sslmode=disable
+      NITRO_PORT: '3000'
+    tmpfs:
+      - /tmp
+    depends_on:
+      node-postgres:
+        condition: service_healthy
+
+  stress:
+    image: golang:1.25-alpine
+    depends_on:
+      go-server:
+        condition: service_started
+      node-server:
+        condition: service_started
+    volumes:
+      - ./tests/stress-docker.sh:/stress.sh:ro
+    entrypoint: [sh, -c, 'apk add --no-cache curl bash perl && bash /stress.sh']
+
+  monitor:
+    image: docker:cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    entrypoint:
+      [
+        sh,
+        -c,
+        "while true; do echo '---'; date -u +%H:%M:%S; docker stats --no-stream --format 'table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.NetIO}}' | grep -E '(NAME|go-server|node-server|postgres|redis)'; sleep 5; done",
+      ]
+    depends_on:
+      - go-server
+      - node-server
