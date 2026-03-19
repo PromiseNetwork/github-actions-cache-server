@@ -12,14 +12,13 @@ func NewRouter(svc cache.Service, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Health checks
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
-	})
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
+	}
+	mux.HandleFunc("GET /{$}", healthHandler)
+	mux.HandleFunc("GET /healthz", healthHandler)
+	mux.HandleFunc("GET /readyz", healthHandler)
 
 	// Prometheus metrics
 	if cfg.MetricsEnabled {
