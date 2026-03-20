@@ -74,8 +74,8 @@ importers:
         specifier: ^11.2.0
         version: 11.2.0
       kysely:
-        specifier: ^0.28.11
-        version: 0.28.11
+        specifier: ^0.28.12
+        version: 0.28.12
       mysql2:
         specifier: ^3.14.4
         version: 3.14.4
@@ -4353,8 +4353,8 @@ packages:
     resolution: {integrity: sha512-WGzpBn57klhxsqRTEABAqF4tqTtqCuxoTIv9m6nIZtMMFTVcrHp7bRDWblzFIfqkb47+OhTztOgHn6A4xItmqg==}
     engines: {node: '>=18'}
 
-  kysely@0.28.11:
-    resolution: {integrity: sha512-zpGIFg0HuoC893rIjYX1BETkVWdDnzTzF5e0kWXJFg5lE0k1/LfNWBejrcnOFu8Q2Rfq/hTDTU7XLUM8QOrpzg==}
+  kysely@0.28.12:
+    resolution: {integrity: sha512-kWiueDWXhbCchgiotwXkwdxZE/6h56IHAeFWg4euUfW0YsmO9sxbAxzx1KLLv2lox15EfuuxHQvgJ1qIfZuHGw==}
     engines: {node: '>=20.0.0'}
 
   language-subtag-registry@0.3.23:
@@ -11483,7 +11483,7 @@ snapshots:
 
   ky@1.9.1: {}
 
-  kysely@0.28.11: {}
+  kysely@0.28.12: {}
 
   language-subtag-registry@0.3.23: {}
 
