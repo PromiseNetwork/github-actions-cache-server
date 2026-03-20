@@ -1,27 +1,20 @@
-FROM node:22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g pnpm@latest-10
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm fetch --prod
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
-RUN pnpm install --frozen-lockfile --prod --offline
+ARG VERSION=8.1.4
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.version=${VERSION}" -o /server ./cmd/server
 
-ARG BUILD_HASH
-ENV BUILD_HASH=${BUILD_HASH}
-RUN pnpm run build
+# ---
 
-# --------------------------------------------
+FROM gcr.io/distroless/static-debian12:nonroot
 
-FROM node:22-alpine AS runner
+COPY --from=builder /server /server
 
-ENV NITRO_CLUSTER_WORKERS=1
+EXPOSE 3000
 
-WORKDIR /app
-
-COPY --from=builder /app/.output ./
-
-CMD ["node", "/app/server/index.mjs"]
+ENTRYPOINT ["/server"]

@@ -1,4 +1,24 @@
 services:
+  cache-server:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - '3000:3000'
+    depends_on:
+      - fake-gcs
+      - postgres
+      - redis
+    environment:
+      API_BASE_URL: http://localhost:3000
+      STORAGE_DRIVER: gcs
+      STORAGE_GCS_BUCKET: test-bucket
+      STORAGE_GCS_ENDPOINT: http://fake-gcs:4443/storage/v1/
+      DB_DRIVER: postgres
+      DB_POSTGRES_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      DEBUG: 'true'
+
   postgres:
     image: postgres:15
     ports:
@@ -8,39 +28,15 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
 
-  mysql:
-    image: mysql:8
+  redis:
+    image: redis:7-alpine
     ports:
-      - 3306:3306
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: mysql
+      - 6379:6379
 
-  minio:
-    image: quay.io/minio/minio:latest
-    entrypoint: sh
-    command: -c 'mkdir -p /data/test && /usr/bin/minio server /data'
+  fake-gcs:
+    image: fsouza/fake-gcs-server:latest
+    entrypoint: [sh]
+    command:
+      [-c, 'mkdir -p /data/test-bucket && /bin/fake-gcs-server -scheme http -port 4443 -data /data']
     ports:
-      - 9000:9000
-    environment:
-      MINIO_ROOT_USER: access_key
-      MINIO_ROOT_PASSWORD: secret_key
-
-  cache-server:
-    build:
-      dockerfile: Dockerfile
-      context: .
-    ports:
-      - '3000:3000'
-    depends_on:
-      - minio
-
-    environment:
-      API_BASE_URL: http://localhost:3000
-
-      STORAGE_DRIVER: s3
-      STORAGE_S3_BUCKET: test
-
-      AWS_ACCESS_KEY_ID: access_key
-      AWS_SECRET_ACCESS_KEY: secret_key
-      AWS_ENDPOINT_URL: http://minio:9000
+      - 4443:4443

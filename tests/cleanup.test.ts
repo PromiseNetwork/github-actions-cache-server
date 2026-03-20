@@ -1,93 +1,127 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+// Rewritten from the original white-box tests that directly imported Node
+// internals (useDB, findKeyMatch, findStaleKeys, pruneKeys, touchKey,
+// updateOrCreateKey, useStorageAdapter). Those modules no longer exist after
+// the Go rewrite, so these tests now exercise the same behaviors through the
+// public HTTP API. Key differences:
+//
+// - "setting last accessed date" → "create and retrieve cache entry":
+//   The original tested updateOrCreateKey/touchKey setting accessed_at timestamps
+//   directly on the DB. Now tests the full reserve→upload→commit→lookup flow
+//   through the API, verifying the entry is retrievable and downloadable.
+//
+// - "getting stale keys" → "list entries by key" / "duplicate reserve":
+//   The original tested findStaleKeys with controlled dates. The stale-key
+//   pruning logic is now tested indirectly via the prune test in e2e.test.ts.
+//   These tests instead cover listing and reservation idempotency.
 
-import {
-  findKeyMatch,
-  findStaleKeys,
-  pruneKeys,
-  touchKey,
-  updateOrCreateKey,
-  useDB,
-} from '~/lib/db'
-import { useStorageAdapter } from '~/lib/storage'
+import crypto from 'node:crypto'
 
-describe('setting last accessed date', async () => {
-  const db = await useDB()
-  beforeEach(async () => {
-    await useStorageAdapter()
-    await useDB()
-    await pruneKeys(db)
+import { describe, expect, test } from 'vitest'
+import { cacheApi } from '~/tests/utils'
+
+async function createCacheEntry(key: string, version: string) {
+  const reserveRes = await cacheApi
+    .post('caches', { json: { key, version } })
+    .json<{ cacheId: number | null }>()
+  if (!reserveRes.cacheId) throw new Error(`Failed to reserve cache for ${key}`)
+
+  const data = new Uint8Array(crypto.randomBytes(64))
+  await cacheApi.patch(`caches/${reserveRes.cacheId}`, {
+    body: data,
+    headers: {
+      'content-range': `bytes 0-${data.length - 1}/*`,
+      'content-type': 'application/octet-stream',
+    },
   })
 
-  const version = '0577ec58bee6d5415625'
-  test('`updateOrCreateKey` sets accessed_at', async () => {
-    const date = new Date('2024-01-01T00:00:00Z')
-    await updateOrCreateKey(db, { key: 'cache-a', version, date })
+  await cacheApi.post(`caches/${reserveRes.cacheId}`, {
+    json: { size: data.length },
+  })
+}
 
-    const match = await findKeyMatch(db, {
-      key: 'cache-a',
-      version,
+async function lookupCache(key: string, version: string) {
+  const res = await cacheApi.get('cache', {
+    searchParams: { keys: key, version },
+  })
+  if (res.status === 204) return null
+  return res.json<{ archiveLocation: string; cacheKey: string }>()
+}
+
+describe('cache entry lifecycle', () => {
+  test('create and retrieve cache entry', async () => {
+    const key = `lifecycle-${crypto.randomUUID()}`
+    const version = crypto.randomBytes(10).toString('hex')
+
+    await createCacheEntry(key, version)
+
+    const entry = await lookupCache(key, version)
+    expect(entry).toBeDefined()
+    expect(entry!.cacheKey).toBe(key)
+    expect(entry!.archiveLocation).toContain('/download/')
+  })
+
+  test('download returns correct content', async () => {
+    const key = `download-verify-${crypto.randomUUID()}`
+    const version = crypto.randomBytes(10).toString('hex')
+    const data = new Uint8Array(crypto.randomBytes(256))
+
+    const reserveRes = await cacheApi
+      .post('caches', { json: { key, version } })
+      .json<{ cacheId: number | null }>()
+    expect(reserveRes.cacheId).toBeTruthy()
+
+    await cacheApi.patch(`caches/${reserveRes.cacheId}`, {
+      body: data,
+      headers: {
+        'content-range': `bytes 0-${data.length - 1}/*`,
+        'content-type': 'application/octet-stream',
+      },
     })
-    expect(match).toBeDefined()
-    expect(match!.accessed_at).toBe('2024-01-01T00:00:00.000Z')
-  })
 
-  test('`touchKey` updates accessed_at', async () => {
-    const date = new Date('2024-01-01T00:00:00Z')
-    await updateOrCreateKey(db, { key: 'cache-a', version, date })
-
-    const match = await findKeyMatch(db, {
-      key: 'cache-a',
-      version,
+    await cacheApi.post(`caches/${reserveRes.cacheId}`, {
+      json: { size: data.length },
     })
-    expect(match).toBeDefined()
-    expect(match!.accessed_at).toBe('2024-01-01T00:00:00.000Z')
-    expect(match!.updated_at).toBe('2024-01-01T00:00:00.000Z')
 
-    const newDate = new Date('2024-01-02T00:00:00Z')
-    await touchKey(db, { key: 'cache-a', version, date: newDate })
+    const entry = await lookupCache(key, version)
+    expect(entry).toBeDefined()
 
-    const newMatch = await findKeyMatch(db, {
-      key: 'cache-a',
-      version,
-    })
-    expect(newMatch).toBeDefined()
-    expect(newMatch!.accessed_at).toBe('2024-01-02T00:00:00.000Z')
-    expect(newMatch!.updated_at).toBe('2024-01-01T00:00:00.000Z')
-  })
-})
-
-describe('getting stale keys', async () => {
-  const db = await useDB()
-  beforeEach(() => pruneKeys(db))
-
-  const version = '0577ec58bee6d5415625'
-  test('returns stale keys if threshold is passed', async () => {
-    const referenceDate = new Date('2024-04-01T00:00:00Z')
-    await updateOrCreateKey(db, { key: 'cache-a', version, date: new Date('2024-01-01T00:00:00Z') })
-    await updateOrCreateKey(db, { key: 'cache-b', version, date: new Date('2024-02-01T00:00:00Z') })
-    await updateOrCreateKey(db, { key: 'cache-c', version, date: new Date('2024-03-15T00:00:00Z') })
-    await updateOrCreateKey(db, { key: 'cache-d', version, date: new Date('2024-03-20T00:00:00Z') })
-
-    const match = await findStaleKeys(db, { olderThanDays: 30, date: referenceDate })
-    expect(match.length).toBe(2)
-
-    const matchA = match.find((m) => m.key === 'cache-a')
-    expect(matchA).toBeDefined()
-    expect(matchA?.accessed_at).toBe('2024-01-01T00:00:00.000Z')
-
-    const matchB = match.find((m) => m.key === 'cache-b')
-    expect(matchB).toBeDefined()
-    expect(matchB?.accessed_at).toBe('2024-02-01T00:00:00.000Z')
+    const downloadRes = await fetch(entry!.archiveLocation)
+    expect(downloadRes.status).toBe(200)
+    const downloaded = new Uint8Array(await downloadRes.arrayBuffer())
+    expect(Buffer.from(downloaded).compare(Buffer.from(data))).toBe(0)
   })
 
-  test('returns all keys if threshold is not passed', async () => {
-    const referenceDate = new Date('2024-04-01T00:00:00Z')
-    await updateOrCreateKey(db, { key: 'cache-a', version, date: new Date('2024-01-01T00:00:00Z') })
-    await updateOrCreateKey(db, { key: 'cache-b', version, date: new Date('2024-02-01T00:00:00Z') })
-    await updateOrCreateKey(db, { key: 'cache-c', version, date: new Date('2024-03-15T00:00:00Z') })
-    await updateOrCreateKey(db, { key: 'cache-d', version, date: new Date('2024-04-01T00:00:00Z') })
+  test('list entries by key', async () => {
+    const key = `list-test-${crypto.randomUUID()}`
+    const version1 = crypto.randomBytes(10).toString('hex')
+    const version2 = crypto.randomBytes(10).toString('hex')
 
-    const match = await findStaleKeys(db, { date: referenceDate })
-    expect(match.length).toBe(4)
+    await createCacheEntry(key, version1)
+    await createCacheEntry(key, version2)
+
+    const res = await cacheApi
+      .get('caches', { searchParams: { key } })
+      .json<{ totalCount: number; artifactCaches: { cacheKey: string; cacheVersion: string }[] }>()
+
+    expect(res.totalCount).toBe(2)
+    expect(res.artifactCaches).toHaveLength(2)
+    const keys = res.artifactCaches.map((c) => c.cacheKey)
+    expect(keys).toContain(key)
+  })
+
+  test('duplicate reserve returns null cacheId', async () => {
+    const key = `dup-reserve-${crypto.randomUUID()}`
+    const version = crypto.randomBytes(10).toString('hex')
+
+    const res1 = await cacheApi
+      .post('caches', { json: { key, version } })
+      .json<{ cacheId: number | null }>()
+    expect(res1.cacheId).toBeTruthy()
+
+    // Second reserve with same key+version should return null
+    const res2 = await cacheApi
+      .post('caches', { json: { key, version } })
+      .json<{ cacheId: number | null }>()
+    expect(res2.cacheId).toBeNull()
   })
 })
