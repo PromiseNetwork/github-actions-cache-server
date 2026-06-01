@@ -69,7 +69,7 @@
     "start-server-and-test": "^2.0.13",
     "testcontainers": "^11.5.1",
     "ts-pattern": "^5.8.0",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.0",
     "wait-on": "^8.0.4"
   },
   "pnpm": {
